@@ -1,20 +1,44 @@
 import ezdxf
 import os
 
-def    # Check each layer's entity count and properties
+def validate_drawing(doc):
+    """Validate that all required entities were created."""
+    msp = doc.modelspace()
+    print("\nValidating drawing contents:")
+
+    # Define expected counts and specifications
+    expected_counts = {
+        '_ABF_SHEET_BORDER': 1,        # Sheet border
+        '_ABF_PART_BORDER': 1,         # Panel border
+        '_ABF_CUTTING_LINES': 6,       # Edge cuts, T-slot, and cable groove
+        'ABF_D10': 6,                  # Corner mounting holes + small cable holes
+        'ABF_D5': 10,                  # Shelf support holes
+        'ABF_D8': 20,                  # Hinge holes (12) + circular pattern (8)
+        'ABF_D20': 2,                  # Medium cable holes
+        'ABF_D6': 13,                  # Ventilation holes (diamond pattern)
+        'ABF_D30': 2,                  # Large cable holes
+    }
+
+    # Define expected geometries
+    expected_geometries = {
+        '_ABF_SHEET_BORDER': {'width': 400, 'height': 1000},
+        '_ABF_PART_BORDER': {'width': 300, 'height': 900},
+    }
+
+    # Check each layer's entity count and properties
     for layer, expected_count in expected_counts.items():
         entities = [e for e in msp if e.dxf.layer == layer]
         count = len(entities)
         print(f"- {layer}: found {count} entities (expected {expected_count})")
-        
+
         if count != expected_count:
             raise ValueError(f"Layer {layer}: expected {expected_count} entities, found {count}")
-            
+
         # Validate entity types and dimensions
         if layer == '_ABF_SHEET_BORDER' or layer == '_ABF_PART_BORDER':
             if not all(e.dxftype() == 'LWPOLYLINE' for e in entities):
                 raise ValueError(f"All entities in {layer} should be polylines")
-                
+
             # Check dimensions if defined
             if layer in expected_geometries:
                 for entity in entities:
@@ -22,18 +46,18 @@ def    # Check each layer's entity count and properties
                     width = max(p[0] for p in points) - min(p[0] for p in points)
                     height = max(p[1] for p in points) - min(p[1] for p in points)
                     expected = expected_geometries[layer]
-                    
+
                     if abs(width - expected['width']) > 1 or abs(height - expected['height']) > 1:
                         raise ValueError(
                             f"{layer} dimensions mismatch: "
                             f"expected {expected['width']}x{expected['height']}, "
                             f"got {width}x{height}"
                         )
-                        
+
         elif layer.startswith('ABF_D'):
             if not all(e.dxftype() == 'CIRCLE' for e in entities):
                 raise ValueError(f"All entities in {layer} should be circles")
-                
+
             # Extract diameter from layer name and validate
             try:
                 expected_diameter = float(layer.replace('ABF_D', ''))
@@ -44,10 +68,21 @@ def    # Check each layer's entity count and properties
                             f"expected {expected_diameter}, got {entity.dxf.radius * 2}"
                         )
             except ValueError:
-                pass  # Skip diameter check if layer name doesn't contain valid diameterdrawing(doc):
-    """Validate that all required entities were created."""
-    msp = doc.modelspace()
-    print("\nValidating drawing contents:")
+                pass  # Skip diameter check if layer name doesn't contain valid diameter
+
+    # Count all entities by layer and type
+    print("\nDetailed entity breakdown:")
+    layers = {}
+    for e in msp:
+        layer = e.dxf.layer
+        if layer not in layers:
+            layers[layer] = []
+        layers[layer].append(e.dxftype())
+
+    for layer, entities in layers.items():
+        print(f"- {layer}: {len(entities)} entities ({', '.join(set(entities))})")
+
+    return True
     
     # Define expected counts and specifications
     expected_counts = {
